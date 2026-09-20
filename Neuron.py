@@ -1,0 +1,270 @@
+import random
+import math
+import json
+import os
+
+pasta_programa = os.path.dirname(os.path.abspath(__file__))
+arquivo_pesos = os.path.join(pasta_programa, "pesos.json")
+
+def quebrar_texto():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+taxa_aprendizagem = 0.01
+
+alfabeto = {
+    "a": "00000",
+    "b": "00001",
+    "c": "00010",
+    "d": "00011",
+    "e": "00100",
+    "f": "00101",
+    "g": "00110",
+    "h": "00111",
+    "i": "01000",
+    "j": "01001",
+    "k": "01010",
+    "l": "01011",
+    "m": "01100",
+    "n": "01101",
+    "o": "01110",
+    "p": "01111",
+    "q": "10000",
+    "r": "10001",
+    "s": "10010",
+    "t": "10011",
+    "u": "10100",
+    "v": "10101",
+    "w": "10110",
+    "x": "10111",
+    "y": "11000",
+    "z": "11001",
+}
+
+class Neuronio:
+    def __init__(self, pesos, bias):
+        self.pesos = pesos
+        self.bias = bias
+
+    def somatorio(self, binario):
+        result = []
+        for i, j in zip(self.pesos, binario):
+            multiplicacao = i * j
+            result.append(multiplicacao)
+
+        result.append(self.bias)
+
+        return sum(result)
+
+    def ativacao(self, soma):
+        sigmoide = 1 / (1 + math.exp(-soma))
+
+        if sigmoide >= 0.5:
+            return 1
+
+        elif sigmoide < 0.5:
+            return 0
+
+def salvar_pesos(neuronios):
+    dados = []
+
+    for neuronio in neuronios:
+        dados.append({
+            "pesos": neuronio.pesos,
+            "bias": neuronio.bias
+        })
+
+    with open(arquivo_pesos, "w") as arquivos:
+        json.dump(dados, arquivos, indent=4)
+
+def carregar_pesos():
+    neuronios = []
+
+    with open(arquivo_pesos, "r") as arquivos:
+        dados = json.load(arquivos)
+
+    for dados_neuronio in dados:
+        pesos = dados_neuronio["pesos"]
+        bias = dados_neuronio["bias"]
+
+        neuronio = Neuronio(pesos, bias)
+        neuronios.append(neuronio)
+
+    return neuronios
+
+
+def converter_letra(letra):
+    return alfabeto[letra]
+
+
+
+def converter_bin(dicio, binario):
+    valor_encontrado = None
+    for chave, valor in dicio.items():
+        if valor == binario:
+            valor_encontrado = chave
+            break
+
+    return valor_encontrado
+
+def refinar_binario(binario):
+    binario_convertido = []
+    for i in binario:
+        numero_separado = int(i)
+        binario_convertido.append(numero_separado)
+
+    return binario_convertido
+
+def gerar_pesos():
+    pesos = []
+    bias_list = []
+    for i in range(5):
+        peso_gerado = random.uniform(-1, 1)
+        pesos.append(peso_gerado)
+
+    bias = random.uniform(-1, 1)
+
+    return pesos, bias
+
+def aprender(binario_entrada, binario_correto, binario_errado):
+    for posicao, (correto, errado) in enumerate(zip(binario_correto, binario_errado)):
+
+        if correto != errado:
+            neuronio = neuronios[posicao]
+            for indice, bit_erntrada in enumerate(binario_entrada):
+                if bit_erntrada == "1":
+
+                    if correto == "1":
+                        neuronio.pesos[indice] += taxa_aprendizagem
+
+                    elif correto == "0":
+                        neuronio.pesos[indice] -= taxa_aprendizagem
+
+            if correto == "1":
+                neuronio.bias += taxa_aprendizagem
+
+            elif correto == "0":
+                neuronio.bias -= taxa_aprendizagem
+
+
+neuronios = []
+bits = []
+if os.path.exists(arquivo_pesos):
+    neuronios = carregar_pesos()
+
+else:
+    neuronios = []
+    for i in range(5):
+        pesos, bias = gerar_pesos()
+        neuronio = Neuronio(pesos, bias)
+
+        neuronios.append(neuronio)
+    salvar_pesos(neuronios)
+
+adm = False
+
+resposta_menu = 3
+
+while True:
+    valores_calculados = []
+    bits = []
+    print("Sistema Neuron")
+    print("\n Deseja:")
+    print("1 - Iniciar treinamento")
+    print("2 - Salvar e terminar treinamento")
+    print("3 - Testar")
+    print("4 - Enserrar")
+    resposta_menu = int(input("Escolha um item do menu: "))
+    quebrar_texto()
+
+    while True:
+        if resposta_menu == 1:
+
+            letra_converter = input("Diga uma letra: ")
+
+            if adm:
+                if letra_converter == "/menu":
+                    break
+
+            if letra_converter == "adm.mode off":
+                adm = False
+                resposta_menu = 3
+
+            else:
+                valores_calculados = []
+                bits = []
+
+                resultado_binario = converter_letra(letra_converter)
+                bits_refinados = refinar_binario(resultado_binario)
+
+                print(" ")
+
+                for i in range(5):
+                    valores = neuronios[i].somatorio(bits_refinados)
+                    valores_calculados.append(valores)
+                    print(f"N{i+1}: {valores}")
+
+                for i in range(5):
+                    bit = neuronios[i].ativacao(valores_calculados[i])
+                    bits.append(bit)
+
+                binario_gerado = "".join(str(bit) for bit in bits)
+
+                print(f"\nBinario gerado: {binario_gerado}")
+                print(converter_bin(alfabeto, binario_gerado))
+
+                acerto = input("Acertei a letra? (s/n) ").lower()
+                if acerto == "n":
+                    letra_correta = input("qual letra deveria ser? ").lower()
+                    letra_c_binario = converter_letra(letra_correta)
+                    aprender(resultado_binario, letra_c_binario, binario_gerado)
+
+                elif acerto == "s":
+                    print("Tudo certo, continuaremos.")    
+
+                else:
+                    print("valor invalido")
+                    continue
+
+                salvar_pesos(neuronios)
+                quebrar_texto
+
+
+        elif resposta_menu == 2:
+            salvar_pesos(neuronios)
+            print("pesos salvos")
+            exit()
+
+        elif resposta_menu == 3:
+
+            letra_converter = input("Diga uma letra: ")
+            
+            if letra_converter == "adm.mode on":
+                adm = True
+
+            elif letra_converter == "adm.mode off":
+                adm = False
+
+            if adm:
+                if letra_converter == "/menu":
+                    break
+
+            else:
+                valores_calculados = []
+                bits = []           
+                resultado_binario = converter_letra(letra_converter)
+                bits_refinados = refinar_binario(resultado_binario)
+    
+                for i in range(5):
+                    valores = neuronios[i].somatorio(bits_refinados)
+                    valores_calculados.append(valores)
+    
+                for i in range(5):
+                    bit = neuronios[i].ativacao(valores_calculados[i])
+                    bits.append(bit)
+    
+                binario_gerado = "".join(str(bit) for bit in bits)
+    
+                print(f"Resposta Neuron: {converter_bin(alfabeto, binario_gerado)}")
+
+        else:
+            exit()
