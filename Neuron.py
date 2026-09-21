@@ -2,6 +2,14 @@ import random
 import math
 import json
 import os
+import sys
+
+treinamento_automatico = False
+
+if "--treinamento" in sys.argv:
+    treinamento_automatico = True
+else:
+    treinamento_automatico = False
 
 pasta_programa = os.path.dirname(os.path.abspath(__file__))
 arquivo_pesos = os.path.join(pasta_programa, "pesos.json")
@@ -64,6 +72,7 @@ class Neuronio:
         elif sigmoide < 0.5:
             return 0
 
+
 def salvar_pesos(neuronios):
     dados = []
 
@@ -75,6 +84,7 @@ def salvar_pesos(neuronios):
 
     with open(arquivo_pesos, "w") as arquivos:
         json.dump(dados, arquivos, indent=4)
+
 
 def carregar_pesos():
     neuronios = []
@@ -96,7 +106,6 @@ def converter_letra(letra):
     return alfabeto[letra]
 
 
-
 def converter_bin(dicio, binario):
     valor_encontrado = None
     for chave, valor in dicio.items():
@@ -106,6 +115,7 @@ def converter_bin(dicio, binario):
 
     return valor_encontrado
 
+
 def refinar_binario(binario):
     binario_convertido = []
     for i in binario:
@@ -114,10 +124,11 @@ def refinar_binario(binario):
 
     return binario_convertido
 
+
 def gerar_pesos():
     pesos = []
     bias_list = []
-    for i in range(5):
+    for i in range(10):
         peso_gerado = random.uniform(-1, 1)
         pesos.append(peso_gerado)
 
@@ -125,12 +136,13 @@ def gerar_pesos():
 
     return pesos, bias
 
-def aprender(binario_entrada, binario_correto, binario_errado):
+
+def aprender(binario_operar, binario_correto, binario_errado):
     for posicao, (correto, errado) in enumerate(zip(binario_correto, binario_errado)):
 
         if correto != errado:
             neuronio = neuronios[posicao]
-            for indice, bit_erntrada in enumerate(binario_entrada):
+            for indice, bit_erntrada in enumerate(binario_operar):
                 if bit_erntrada == "1":
 
                     if correto == "1":
@@ -162,24 +174,30 @@ else:
 
 adm = False
 
-resposta_menu = 3
+if treinamento_automatico:
+    resposta_menu = 1
+
+else:
+    resposta_menu = 3
 
 while True:
     valores_calculados = []
     bits = []
-    print("Sistema Neuron")
-    print("\n Deseja:")
-    print("1 - Iniciar treinamento")
-    print("2 - Salvar e terminar treinamento")
-    print("3 - Testar")
-    print("4 - Enserrar")
-    resposta_menu = int(input("Escolha um item do menu: "))
-    quebrar_texto()
 
     while True:
+        valores_calculados = []
+        bits = []
+
         if resposta_menu == 1:
 
-            letra_converter = input("Diga uma letra: ")
+            if treinamento_automatico ==  False:
+                letra_converter = input("Diga duas letra: ")
+
+            else: 
+                letra_converter = input()
+
+                if letra_converter == "encerrar":
+                    exit()
 
             if adm:
                 if letra_converter == "/menu":
@@ -190,43 +208,66 @@ while True:
                 resposta_menu = 3
 
             else:
-                valores_calculados = []
-                bits = []
+                binario_operar = []
 
-                resultado_binario = converter_letra(letra_converter)
-                bits_refinados = refinar_binario(resultado_binario)
-
-                print(" ")
+                for i in letra_converter:
+                    resultado_binario = converter_letra(i)
+                    bits_refinados = refinar_binario(resultado_binario)
+                    binario_operar.append(bits_refinados)
+                if treinamento_automatico == False:
+                    print(" ")
 
                 for i in range(5):
                     valores = neuronios[i].somatorio(bits_refinados)
                     valores_calculados.append(valores)
-                    print(f"N{i+1}: {valores}")
+
+                    if treinamento_automatico == False:
+                        print(f"N{i+1}: {valores}")
 
                 for i in range(5):
                     bit = neuronios[i].ativacao(valores_calculados[i])
                     bits.append(bit)
 
                 binario_gerado = "".join(str(bit) for bit in bits)
+                letra_prevista = converter_bin(alfabeto, binario_gerado)
 
-                print(f"\nBinario gerado: {binario_gerado}")
-                print(converter_bin(alfabeto, binario_gerado))
+                if treinamento_automatico == False:
+                    print(f"\nBinario gerado: {binario_gerado}")
+                    print(letra_prevista)
+                else:
+                    print(letra_prevista, flush = True)
+                if treinamento_automatico == False:
+                    acerto = input("Acertei a letra? (s/n) ").lower()
 
-                acerto = input("Acertei a letra? (s/n) ").lower()
+                else:
+                    acerto = input()
+
                 if acerto == "n":
-                    letra_correta = input("qual letra deveria ser? ").lower()
+                    if treinamento_automatico == False:
+                        letra_correta = input("qual letra deveria ser? ").lower()
+
+                    else: 
+                        letra_correta = input()
+                        
                     letra_c_binario = converter_letra(letra_correta)
-                    aprender(resultado_binario, letra_c_binario, binario_gerado)
+                    aprender(binario_operar, letra_c_binario, binario_gerado)
+
+                    if treinamento_automatico:
+                        print("OK", flush = True)
 
                 elif acerto == "s":
-                    print("Tudo certo, continuaremos.")    
+                    if treinamento_automatico:
+                        print("OK", flush = True)
+
+                    else:
+                        print("Tudo certo, continuaremos.")    
 
                 else:
                     print("valor invalido")
                     continue
 
                 salvar_pesos(neuronios)
-                quebrar_texto
+                quebrar_texto()
 
 
         elif resposta_menu == 2:
@@ -268,3 +309,12 @@ while True:
 
         else:
             exit()
+
+    print("Sistema Neuron")
+    print("\n Deseja:")
+    print("1 - Iniciar treinamento")
+    print("2 - Salvar e terminar treinamento")
+    print("3 - Testar")
+    print("4 - Enserrar")
+    resposta_menu = int(input("Escolha um item do menu: "))
+    quebrar_texto()
