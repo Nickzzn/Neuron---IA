@@ -16,7 +16,7 @@ def quebrar_texto():
 taxa_aprendizagem = 0.1
 
 #dicionario de codificação letra -> binario
-alfabeto = {
+caracteres = {
     #miusculas
     "A": "00000000",
     "Á": "00000001",
@@ -63,20 +63,21 @@ alfabeto = {
     "ã": "00101001",
     "b": "00101010",
     "c": "00101011",
-    "d": "00101100",
-    "e": "00101101",
-    "é": "00101110",
-    "ê": "00101111",
-    "f": "00110000",
-    "g": "00110001",
-    "h": "00110010",
-    "i": "00110011",
-    "í": "00110100",
-    "j": "00110101",
-    "k": "00110110",
-    "l": "00110111",
-    "m": "00111000",
-    "n": "00111001",
+    "ç": "00101100",
+    "d": "00101101",
+    "e": "00101110",
+    "é": "00101111",
+    "ê": "00110000",
+    "f": "00110001",
+    "g": "00110010",
+    "h": "00110011",
+    "i": "00110100",
+    "í": "00110101",
+    "j": "00110110",
+    "k": "00110111",
+    "l": "00111000",
+    "m": "00111001",
+    "n": "00111010",
     "o": "00111010",
     "ó": "00111011",
     "õ": "00111100",
@@ -91,28 +92,82 @@ alfabeto = {
     "w": "01000101",
     "x": "01000110",
     "y": "01000111",
-    "z": "01001000",
+    "z": "01000100",
     #numeros
-    "0": "01001001",
-    "1": "01001010",
-    "2": "01001011",
-    "3": "01001100",
-    "4": "01001101",
-    "5": "01001110",
-    "6": "01001111",
-    "7": "01010000",
-    "8": "01010001",
-    "9": "01010010",
+    "0": "01000101",
+    "1": "01000110",
+    "2": "01000111",
+    "3": "01001000",
+    "4": "01001001",
+    "5": "01001010",
+    "6": "01001011",
+    "7": "01001100",
+    "8": "01001101",
+    "9": "01001110",
     #caracteres especiais
-    " ": "01010011",
-    ",": "01010100",
-    ".": "01010101",
-    ":": "01010110",
-    "!": "01010111",
-    "?": "01011000"
+    " ": "01001111",
+    ",": "01001001",
+    ".": "01001010",
+    ":": "01001011",
+    "!": "01001100",
+    "?": "01001101",
+    #comandos
+    "/parar": "01001101"
 
 }
 
+class Let:
+    def __init__(self):
+        self.caracteres = []
+        self.estado_memoria = None
+        self.proximo = None
+
+class Letter:
+    def __init__(self):
+        self.lets = [Let() for _ in range(5)]
+
+        for i in range(4):
+            self.lets[i].proximo = self.lets[i+1]
+
+def gerar_let_letters(texto, neuronio_letra_dict, neuronio_memoria_lista):
+    letras_validas = [letra for letra in texto if letra in caracteres]
+    lista_letters = []
+
+    if not letras_validas:
+        return lista_letters, [0.0] * 8
+
+    memoria = [0.0] * 8
+    contador_atualizacoes = 0
+
+    letter_atual = Letter()
+    indice_let_atual = 0
+
+    for letra in letras_validas:
+        bits_refinados = [int(b) for b in caracteres[letra]]
+        valores_letra = neuronio_letra_dict[letra].calcular(bits_refinados)
+        entrada_memoria = memoria + valores_letra
+        memoria = [n.calcular(entrada_memoria) for n in neuronio_memoria_lista]
+        
+        contador_atualizacoes += 1
+
+        if contador_atualizacoes % 5 == 0:
+            letter_atual.lets[indice_let_atual].estado_memoria = list(memoria)
+            indice_let_atual += 1
+
+            if indice_let_atual == 5:
+                lista_letters.append(letter_atual)
+                letter_atual = Letter()
+                indice_let_atual = 0
+    
+    if contador_atualizacoes % 5 != 0:
+        letter_atual.lets[indice_let_atual].estado_memoria = list(memoria)
+
+        lista_letters.append(letter_atual)
+
+    return lista_letters, memoria
+
+
+        
 #Classe do neuronio de saida
 class Neuronio:
     def __init__(self, pesos, bias):
@@ -131,11 +186,21 @@ class Neuronio:
         result.append(self.bias)
         return sum(result)
 
-    def calcular(self, entrada):
-        soma = self.somatorio(entrada)
-        self.ultima_saida = 1 / (1 + math.exp(-soma))
+    def gerar_saida(memoria):
+        return [neuronio.calcular(memoria) for neuronio in neuronios]
 
-        return self.ultima_saida
+    def memoria_para_binario(memoria):
+        valores_saida = gerar_saida(memoria)
+        bits_saida = []
+        
+        for valor in valores_saida:
+            if valor >= 0.5:
+                bits_saida.append(1)
+
+            else:
+                bits_saida.append(0)
+
+        return bits_saida
 
     def retropropar_e_atualizar(self, erro_gradiente):
         erros_entrada = [erro_gradiente * peso for peso in self.pesos]
@@ -220,8 +285,8 @@ def carregar_pesos():
 
 
 #pega a letra e retorna o binario do alfabeto
-def converter_letra(letra):
-    return alfabeto[letra]
+def converter_caractere(caractere):
+    return caracteres[caractere]
 
 
 #faz o caminho inverso, pegando o binario e retornando uma letra
@@ -309,7 +374,7 @@ if os.path.exists(arquivo_pesos):
     except (TypeError, KeyError, json.JSONDecodeError):
         neuronios = [Neuronio(*gerar_pesos_saida()) for _ in range(8)]
 
-        for letra in alfabeto:
+        for letra in caracteres:
             neuronios_letras[letra] = NeuronioLetra(8)
 
         neuronios_memoria = [
@@ -329,7 +394,7 @@ else:
         for _ in range(8)
     ]
 
-    for letra in alfabeto:
+    for letra in caracteres:
         neuronios_letras[letra] = NeuronioLetra(8)
 
     neuronios_memoria = [
@@ -354,88 +419,83 @@ def atualizar_memoria(memoria, valores_letra):
 
     return nova_memoria
 
-def executar_backpropagation(texto, letra_correta):
-    texto_filtrado = [letra for letra in texto if letra in alfabeto]
+def executar_backpropagation(texto_entrada, texto_correto):
+    letters_pergunta, memoria = gerar_let_letters(texto_entrada, neuronios_letras, neuronios_memoria)
+    letters_correcao, _ = gerar_let_letters(texto_correto, neuronios_letras, neuronios_memoria)
 
-    if len(texto_filtrado) == 0:
-        print("O texto não possui letras válidas para o alfabeto.")
-        return
+    for letra_alvo in texto_correto:
 
-    memoria = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    historico_letras_ativadas = []
-    historico_memorias = [memoria.copy()]
+        memoria_anterior = memoria.copy()
 
-    for letra in texto:
-        if letra not in alfabeto:
-            continue
-        
-        bits_refinados = refinar_binario(converter_letra(letra))
-        
-        valores_letra = neuronios_letras[letra].calcular(bits_refinados)
-        historico_letras_ativadas.append((letra, valores_letra))
-        
-        entrada_memoria = memoria + valores_letra
-        memoria = [n.calcular(entrada_memoria) for n in neuronios_memoria]
-        historico_memorias.append(memoria.copy())
+        saidas_finais = [n.calcular(memoria) for n in neuronios]
+        binario_correto = refinar_binario(converter_caractere(letra_alvo))
 
+        erros_propagar_memoria = [0.0] * 8
 
-    saidas_finais = [n.calcular(memoria) for n in neuronios]
-    binario_correto = refinar_binario(converter_letra(letra_correta))
+        for idx, correto in enumerate(binario_correto):
+            y = saidas_finais[idx]
+            erro = y - correto
+            derivada_sig = y * (1 - y)
+            erro_gradiente = erro * derivada_sig
 
-    erros_propagar_memoria = [0.0] * 8
-
-    for idx, correto in enumerate(binario_correto):
-        y = saidas_finais[idx]
-        erro = y - correto
-        derivada_sig = y * (1 - y)
-        erro_gradiente = erro * derivada_sig
-        
-        erros_voltam = neuronios[idx].retropropar_e_atualizar(erro_gradiente)
-
-        for i in range(8):
-            erros_propagar_memoria[i] += erros_voltam[i]
-
-    historico_letras_ativadas.reverse()
-    historico_memorias.pop()
-    historico_memorias.reverse()
-
-    for idx, (letra, valores_letra) in enumerate(historico_letras_ativadas):
-        proximos_erros_memoria = [0.0] * 8
-        erros_para_neuronio_letra = [0.0] * 8
-        
-        for m_idx, n_mem in enumerate(neuronios_memoria):
-            erros_voltam = n_mem.retropropar_e_atualizar(erros_propagar_memoria[m_idx])
-            
+            erros_voltam = neuronios[idx].retropropar_e_atualizar(erro_gradiente)
             for i in range(8):
-                proximos_erros_memoria[i] += erros_voltam[i]
+                erros_propagar_memoria[i] += erros_voltam[i]
 
+        vaslores_letra_alvo = neuronios_letras[letra_alvo].calcular(binario_correto)
 
+        entrada_memoria_atual = memoria_anterior + vaslores_letra_alvo
+
+        erros_para_neuronio_letra = [0.0] * 8
+        for m_idx, n_mem in enumerate(neuronios_memoria):
+            
+            erros_voltam = n_mem.retropropar_e_atualizar(erros_propagar_memoria[m_idx])
             for i in range(8):
                 erros_para_neuronio_letra[i] += erros_voltam[8 + i]
-                
-        neuronios_letras[letra].retropropar_e_atualizar(erros_para_neuronio_letra)
-        
-        erros_propagar_memoria = proximos_erros_memoria
+
+        neuronios_letras[letra_alvo].retropropar_e_atualizar(erros_para_neuronio_letra)
+
+        memoria = [n.calcular(entrada_memoria_atual) for n in neuronios_memoria]
+    
 
 def testar_rede(texto):
-    memoria = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    letters_teste, memoria = gerar_let_letters(texto, neuronios_letras, neuronios_memoria)
 
-    for letra in texto:
-        if letra not in alfabeto: 
-            continue
+    comando_parar = "/parar"
+    letra = ""
+    limite_caracteres = 20
+    resposta_gerada = []
+
+    while True:
+        bits_saida = [1 if n.calcular(memoria) >= 0.5 else 0 for n in neuronios]
+        binario_saida = "".join(str(bit) for bit in bits_saida)
+        letra_saida = converter_bin(caracteres, binario_saida)
+
+        if letra_saida is not None:
+            resposta_gerada.append(letra_saida)
+            teste_limite = "".join(resposta_gerada)
+
+            if len(teste_limite) >= limite_caracteres:
+                break
+
+            elif letra_saida == comando_parar:
+                break
+
+            else:
+                bits_refinados = refinar_binario(binario_saida)
+                valores_letra = neuronios_letras[letra_saida].calcular(bits_refinados)
+                memoria = [n.calcular(memoria + valores_letra) for n in neuronios_memoria]
+        else:
+            print("\nRESPOSTA")
+            print("Resposta: None")
+            return "Erro"
         
-        bits_refinados = refinar_binario(converter_letra(letra))
-        valores_letra = neuronios_letras[letra].calcular(bits_refinados)
-        memoria = [n.calcular(memoria + valores_letra) for n in neuronios_memoria]
+    texto_final = "".join(resposta_gerada)
 
-    bits_saida = [1 if n.calcular(memoria) >= 0.5 else 0 for n in neuronios]
-    binario_saida = "".join(str(bit) for bit in bits_saida)
-    letra_saida = converter_bin(alfabeto, binario_saida)
 
     print("\nRESULTADO")
-    print(f"Binário gerado: {binario_saida}")
-    print(f"Letra: {letra_saida}")
-    return letra_saida
+    print(f"Resposta: {texto_final}")
+    return texto_final
 
 
 #modo adm
@@ -475,10 +535,21 @@ while True:
                 acerto = input("\nAcertei? (s/n) ").lower()
 
                 if acerto == "n":
-                    letra_certa = input("digite a resposta correta: ")
+                    while True:
+                        texto_certo = input("digite a resposta correta: ")
 
-                    executar_backpropagation(texto, letra_certa)
+                        valido = any(letra in caracteres for letra in texto_certo)
+
+                        if valido:
+                            executar_backpropagation(texto, texto_certo)
+                            print("Pesos balanceados")
+                            break
+
+                        else:
+                            print("Caractere invalido")
+                        
                     input("\nPressione ENTER pra continuar")
+
                 else:
                     print("Ótimo, vamos continuar")
 
