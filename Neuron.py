@@ -78,94 +78,125 @@ caracteres = {
     "l": "00111000",
     "m": "00111001",
     "n": "00111010",
-    "o": "00111010",
-    "ó": "00111011",
-    "õ": "00111100",
-    "p": "00111101",
-    "q": "00111110",
-    "r": "00111111",
-    "s": "01000000",
-    "t": "01000001",
-    "u": "01000010",
-    "ú": "01000011",
-    "v": "01000100",
-    "w": "01000101",
-    "x": "01000110",
-    "y": "01000111",
-    "z": "01000100",
+    "o": "00111011",
+    "ó": "00111100",
+    "õ": "00111101",
+    "p": "00111110",
+    "q": "00111111",
+    "r": "01000000",
+    "s": "01000001",
+    "t": "01000010",
+    "u": "01000011",
+    "ú": "01000100",
+    "v": "01000101",
+    "w": "01000110",
+    "x": "01000111",
+    "y": "01001000",
+    "z": "01001001",
     #numeros
-    "0": "01000101",
-    "1": "01000110",
-    "2": "01000111",
-    "3": "01001000",
-    "4": "01001001",
-    "5": "01001010",
-    "6": "01001011",
-    "7": "01001100",
-    "8": "01001101",
-    "9": "01001110",
+    "0": "01001010",
+    "1": "01001011",
+    "2": "01001100",
+    "3": "01001101",
+    "4": "01001110",
+    "5": "01001111",
+    "6": "01010000",
+    "7": "01010001",
+    "8": "01010010",
+    "9": "01010011",
     #caracteres especiais
-    " ": "01001111",
-    ",": "01001001",
-    ".": "01001010",
-    ":": "01001011",
-    "!": "01001100",
-    "?": "01001101",
+    " ": "01010100",
+    ",": "01010101",
+    ".": "01010110",
+    ":": "01010111",
+    "!": "01011000",
+    "?": "01011001",
+    "%": "01011010",
     #comandos
-    "/parar": "01001101"
+    "/parar": "01011011"
 
 }
 
 class Let:
     def __init__(self):
-        self.caracteres = []
         self.estado_memoria = None
-        self.proximo = None
+        self.historico_memoria = []
+        self.posicao = None
+        self.memoria_inicial = None
+        self.caracteres = []
 
 class Letter:
     def __init__(self):
         self.lets = [Let() for _ in range(5)]
 
-        for i in range(4):
-            self.lets[i].proximo = self.lets[i+1]
 
 def gerar_let_letters(texto, neuronio_letra_dict, neuronio_memoria_lista):
     letras_validas = [letra for letra in texto if letra in caracteres]
     lista_letters = []
 
     if not letras_validas:
-        return lista_letters, [0.0] * 8
-
-    memoria = [0.0] * 8
-    contador_atualizacoes = 0
+        return lista_letters
 
     letter_atual = Letter()
-    indice_let_atual = 0
+    indice_let = 0
+    posicao_let = 1
+
+    contador_caracteres = 0
+    memoria = [0.0] * 8
 
     for letra in letras_validas:
+
+        if contador_caracteres == 0:
+            letter_atual.lets[indice_let].memoria_inicial = list(memoria)
         bits_refinados = [int(b) for b in caracteres[letra]]
+
         valores_letra = neuronio_letra_dict[letra].calcular(bits_refinados)
-        entrada_memoria = memoria + valores_letra
-        memoria = [n.calcular(entrada_memoria) for n in neuronio_memoria_lista]
-        
-        contador_atualizacoes += 1
 
-        if contador_atualizacoes % 5 == 0:
-            letter_atual.lets[indice_let_atual].estado_memoria = list(memoria)
-            indice_let_atual += 1
+        memoria_anterior = list(memoria)
 
-            if indice_let_atual == 5:
+        entrada_memoria = memoria_anterior + valores_letra
+
+        memoria = atualizar_memoria(memoria_anterior, valores_letra)
+
+        letter_atual.lets[indice_let].historico_memoria.append({
+            "memoria_anterior": memoria_anterior,
+            "valores_letra": list(valores_letra),
+            "entrada": list(entrada_memoria),
+            "memoria_resultante": list(memoria)
+        })
+
+        letter_atual.lets[indice_let].caracteres.append(letra)
+
+        contador_caracteres += 1
+
+        if contador_caracteres == 5:
+            letter_atual.lets[indice_let].estado_memoria = list(memoria)
+            letter_atual.lets[indice_let].posicao = posicao_let
+
+            indice_let += 1
+            posicao_let += 1
+
+            contador_caracteres = 0
+            memoria = [0.0] * 8
+
+            if indice_let == 5:
+
                 lista_letters.append(letter_atual)
-                letter_atual = Letter()
-                indice_let_atual = 0
-    
-    if contador_atualizacoes % 5 != 0:
-        letter_atual.lets[indice_let_atual].estado_memoria = list(memoria)
 
+                letter_atual = Letter()
+                indice_let = 0
+
+    if contador_caracteres > 0:
+
+        letter_atual.lets[indice_let].estado_memoria = list(memoria)
+        letter_atual.lets[indice_let].posicao = posicao_let
+
+        indice_let += 1
+
+    if indice_let > 0:
         lista_letters.append(letter_atual)
 
-    return lista_letters, memoria
-
+    return lista_letters
 
         
 #Classe do neuronio de saida
@@ -186,22 +217,6 @@ class Neuronio:
         result.append(self.bias)
         return sum(result)
 
-    def gerar_saida(memoria):
-        return [neuronio.calcular(memoria) for neuronio in neuronios]
-
-    def memoria_para_binario(memoria):
-        valores_saida = gerar_saida(memoria)
-        bits_saida = []
-        
-        for valor in valores_saida:
-            if valor >= 0.5:
-                bits_saida.append(1)
-
-            else:
-                bits_saida.append(0)
-
-        return bits_saida
-
     def retropropar_e_atualizar(self, erro_gradiente):
         erros_entrada = [erro_gradiente * peso for peso in self.pesos]
 
@@ -211,7 +226,6 @@ class Neuronio:
         self.bias -= taxa_aprendizagem * erro_gradiente
 
         return erros_entrada
-
 
 #cria um neuronio para cada letra
 class NeuronioLetra:
@@ -223,7 +237,13 @@ class NeuronioLetra:
             self.neuronios.append(Neuronio(pesos, bias))
 
     def calcular(self, entrada):
-        return [n.calcular(entrada) for n in self.neuronios]
+        valores_ativados = []
+
+        for n in self.neuronios:
+            soma = n.somatorio(entrada)
+            valores_ativados.append(1 / (1 + math.exp(-soma)))
+
+        return valores_ativados
 
     def retropropar_e_atualizar(self, erros_gradiente_saida):
         for n, erro in zip(self.neuronios, erros_gradiente_saida):
@@ -255,6 +275,7 @@ class NeuronioMemoria:
         self.bias -= taxa_aprendizagem * erro_gradiente
 
         return erro_entrada
+
 
 #salva pesos em um json
 def salvar_pesos(neuronios, neuronios_letras, neuronios_memoria):
@@ -334,29 +355,33 @@ def gerar_pesos_memoria():
     return pesos, bias
 
 
-def gerar_saida(memoria):
+def gerar_saida(let_objeto):
+    if let_objeto.estado_memoria is None:
+        return [0.0] * 8
+        
+    memoria = let_objeto.estado_memoria
     valores_saida = []
 
     for neuronio in neuronios:
         soma = neuronio.somatorio(memoria)
-        valor = 1 / (1 + math.exp(-soma))
+        valor = 1 / (1 + math.exp(-soma)) 
         valores_saida.append(valor)
 
     return valores_saida
 
-#transforma a memoria em binario para os neuroios de saida
-def memoria_para_binario(memoria):
-    valores_saida = gerar_saida(memoria)
+# Transforma a memória do Let em binário para os neurônios de saída
+def memoria_para_binario(let_objeto):
+    valores_saida = gerar_saida(let_objeto)
     bits_saida = []
 
     for valor in valores_saida:
         if valor >= 0.5:
             bits_saida.append(1)
-
         else:
             bits_saida.append(0)
 
     return bits_saida
+
 
 
 neuronios = []
@@ -389,112 +414,164 @@ if os.path.exists(arquivo_pesos):
         )
 
 else:
-    neuronios = [
-        Neuronio(*gerar_pesos_saida())
-        for _ in range(8)
-    ]
+    neuronios = [Neuronio(*gerar_pesos_saida()) for _ in range(8)]
 
     for letra in caracteres:
         neuronios_letras[letra] = NeuronioLetra(8)
 
-    neuronios_memoria = [
-        NeuronioMemoria(*gerar_pesos_memoria())
-        for _ in range(8)
-    ]
+    neuronios_memoria = [NeuronioMemoria(*gerar_pesos_memoria()) for _ in range(8)]
 
-    salvar_pesos(
-        neuronios,
-        neuronios_letras,
-        neuronios_memoria
-    )
+    salvar_pesos(neuronios, neuronios_letras, neuronios_memoria)
 
 #atualiza a memoria
 def atualizar_memoria(memoria, valores_letra):
     entrada_memoria = memoria + valores_letra
-    nova_memoria = []
-
-    for neuronio in neuronios_memoria:
-        valor = neuronio.calcular(entrada_memoria)
-        nova_memoria.append(valor)
+    nova_memoria = [neuronio.calcular(entrada_memoria) for neuronio in neuronios_memoria]
 
     return nova_memoria
 
 def executar_backpropagation(texto_entrada, texto_correto):
-    letters_pergunta, memoria = gerar_let_letters(texto_entrada, neuronios_letras, neuronios_memoria)
-    letters_correcao, _ = gerar_let_letters(texto_correto, neuronios_letras, neuronios_memoria)
+    memoria_global_pergunta = gerar_let_letters(texto_entrada, neuronios_letras, neuronios_memoria)
+    memoria_global_correcao = gerar_let_letters(texto_correto, neuronios_letras, neuronios_memoria)
 
-    for letra_alvo in texto_correto:
+    for indice_letter, letter in enumerate(memoria_global_pergunta):
+        if indice_letter >= len(memoria_global_correcao):
+            break
 
-        memoria_anterior = memoria.copy()
+        letter_correto = memoria_global_correcao[indice_letter]
 
-        saidas_finais = [n.calcular(memoria) for n in neuronios]
-        binario_correto = refinar_binario(converter_caractere(letra_alvo))
+        for indice_let, let in enumerate(letter.lets):
+            if indice_let >= len(letter_correto.lets):
+                break
 
-        erros_propagar_memoria = [0.0] * 8
+            if let.estado_memoria is None:
+                continue
 
-        for idx, correto in enumerate(binario_correto):
-            y = saidas_finais[idx]
-            erro = y - correto
-            derivada_sig = y * (1 - y)
-            erro_gradiente = erro * derivada_sig
+            let_correto = letter_correto.lets[indice_let]
+            if let_correto.estado_memoria is None:
+                continue
 
-            erros_voltam = neuronios[idx].retropropar_e_atualizar(erro_gradiente)
-            for i in range(8):
-                erros_propagar_memoria[i] += erros_voltam[i]
+            memoria = list(let.estado_memoria)
+            memoria_correta = list(let_correto.estado_memoria)
 
-        vaslores_letra_alvo = neuronios_letras[letra_alvo].calcular(binario_correto)
+            erro_memoria_atual = [memoria[i] - memoria_correta[i] for i in range(8)]
+            historico = let.historico_memoria
 
-        entrada_memoria_atual = memoria_anterior + vaslores_letra_alvo
+            for indice_reverso, passo in enumerate(reversed(historico)):
+                entrada_memoria = passo["entrada"]
+                erros_entrada = [0.0] * 16
 
-        erros_para_neuronio_letra = [0.0] * 8
-        for m_idx, n_mem in enumerate(neuronios_memoria):
+                for m_idx, n_mem in enumerate(neuronios_memoria):
+                    soma = sum(peso * valor for peso, valor in zip(n_mem.pesos, entrada_memoria)) + n_mem.bias
+                    saida = 1 / (1 + math.exp(-soma))
+                    derivada_sigmoid = saida * (1 - saida)
+                    
+                    erro_gradiente = erro_memoria_atual[m_idx] * derivada_sigmoid
+
+                    for i in range(16):
+                        erros_entrada[i] += erro_gradiente * n_mem.pesos[i]
+
+                    for i in range(16):
+                        n_mem.pesos[i] -= taxa_aprendizagem * erro_gradiente * entrada_memoria[i]
+
+                    n_mem.bias -= taxa_aprendizagem * erro_gradiente
+
+                erro_memoria_atual = erros_entrada[:8]
+                erros_valores_letra = erros_entrada[8:16]
+
+                indice_caractere = len(historico) - 1 - indice_reverso
+                letra_entrada = let.caracteres[indice_caractere]
+
+                if letra_entrada not in neuronios_letras:
+                    continue
+
+                neuronios_letras[letra_entrada].retropropar_e_atualizar(erros_valores_letra)
+    if memoria_global_correcao:
+        ultimo_letter = memoria_global_correcao[-1]
+        ultimo_let = None
+        for let in reversed(ultimo_letter.lets):
+            if let.estado_memoria is not None:
+                ultimo_let = let
+                break
+        
+        if ultimo_let is not None:
+            memoria_final = ultimo_let.estado_memoria
             
-            erros_voltam = n_mem.retropropar_e_atualizar(erros_propagar_memoria[m_idx])
-            for i in range(8):
-                erros_para_neuronio_letra[i] += erros_voltam[8 + i]
+            bits_parar = [int(b) for b in caracteres["/parar"]]
+            
+            for idx, neuronio_saida in enumerate(neuronios):
+                soma = neuronio_saida.somatorio(memoria_final)
+                saida_atual = 1 / (1 + math.exp(-soma))
+                
+                erro_bit = saida_atual - bits_parar[idx]
+                derivada = saida_atual * (1 - saida_atual)
+                gradiente_saida = erro_bit * derivada
+                
+                neuronio_saida.retropropar_e_atualizar(gradiente_saida)
 
-        neuronios_letras[letra_alvo].retropropar_e_atualizar(erros_para_neuronio_letra)
-
-        memoria = [n.calcular(entrada_memoria_atual) for n in neuronios_memoria]
-    
 
 def testar_rede(texto):
-    letters_teste, memoria = gerar_let_letters(texto, neuronios_letras, neuronios_memoria)
+    memoria_global = gerar_let_letters(texto, neuronios_letras, neuronios_memoria)
 
     comando_parar = "/parar"
-    letra = ""
     limite_caracteres = 20
     resposta_gerada = []
 
+    if not memoria_global:
+        print("\nRESPOSTA")
+        print("Neuron: None")
+        return "Erro"
+
+    letter_atual = memoria_global[-1]
+    let_atual = None
+
+    for let in reversed(letter_atual.lets):
+        if let.estado_memoria is not None:
+            let_atual = let
+            break
+
+    if let_atual is None:
+        print("\nRESPOSTA")
+        print("Neuron: None")
+        return "Erro"
+
+    memoria = list(let_atual.estado_memoria)
+
     while True:
-        bits_saida = [1 if n.calcular(memoria) >= 0.5 else 0 for n in neuronios]
+        bits_saida = []
+
+        for n in neuronios:
+            soma = n.somatorio(memoria)
+            ativacao = 1 / (1 + math.exp(-soma)) # Mantém o valor estritamente entre 0 e 1
+            bits_saida.append(1 if ativacao >= 0.5 else 0)
+            
         binario_saida = "".join(str(bit) for bit in bits_saida)
         letra_saida = converter_bin(caracteres, binario_saida)
 
-        if letra_saida is not None:
-            resposta_gerada.append(letra_saida)
-            teste_limite = "".join(resposta_gerada)
-
-            if len(teste_limite) >= limite_caracteres:
-                break
-
-            elif letra_saida == comando_parar:
-                break
-
-            else:
-                bits_refinados = refinar_binario(binario_saida)
-                valores_letra = neuronios_letras[letra_saida].calcular(bits_refinados)
-                memoria = [n.calcular(memoria + valores_letra) for n in neuronios_memoria]
-        else:
+        if letra_saida is None:
             print("\nRESPOSTA")
-            print("Resposta: None")
+            print(f"Neuron: Erro de decodificação (Binário gerado inválido: {binario_saida})")
             return "Erro"
-        
-    texto_final = "".join(resposta_gerada)
 
+        if letra_saida == comando_parar:
+            break
+
+        resposta_gerada.append(letra_saida)
+        texto_atual = "".join(resposta_gerada)
+
+        if len(texto_atual) >= limite_caracteres:
+            break
+
+        bits_refinados = refinar_binario(binario_saida)
+        valores_letra = neuronios_letras[letra_saida].calcular(bits_refinados)
+
+        memoria = atualizar_memoria(memoria, valores_letra)
+
+    texto_final = "".join(resposta_gerada)
 
     print("\nRESULTADO")
     print(f"Resposta: {texto_final}")
+
     return texto_final
 
 
@@ -513,7 +590,7 @@ while True:
 
         if resposta_menu == 1:
             quebrar_texto()
-            texto = input("Escreva um texto: ").lower()
+            texto = input("Escreva um texto: ")
 
             if texto == "adm.mode on":
                 adm = True
@@ -529,6 +606,7 @@ while True:
                     elif modo_adm == "/menu":
                         break
                 break
+
             else:
                 palpite = testar_rede(texto)
 
