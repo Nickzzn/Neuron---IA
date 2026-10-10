@@ -1,13 +1,16 @@
+
 import random
 import math
 import json
 import time
 import os
 import sys
+import hashlib
 
 #procura o arquivo de pesos na mesma pasta que o arquivo
 pasta_programa = os.path.dirname(os.path.abspath(__file__))
 arquivo_pesos = os.path.join(pasta_programa, "pesos.json")
+treinamento_auto = not sys.stdin.isatty()
 
 #função estetica do terminal
 def quebrar_texto():
@@ -15,12 +18,11 @@ def quebrar_texto():
 
 def valor_zerar(multiplicar):
     if multiplicar:
-        return [0.0] * 8
+       return [0.0] * 8
 
     else:
         return [0.0]
 
-    
 #taxa de aprendizagem
 taxa_aprendizagem = 0.1
 
@@ -123,7 +125,6 @@ caracteres = {
     "%": "01011010",
     #comandos
     "/parar": "01011011"
-
 }
 #endregion
 
@@ -136,6 +137,7 @@ class Let:
         self.memoria_inicial = None
         self.caracteres = []
 
+
 class Letter:
     def __init__(self):
         self.lets = [Let() for _ in range(5)]
@@ -147,26 +149,21 @@ def gerar_let_letters(texto, neuronio_letra_dict, neuronio_memoria_lista):
 
     if not letras_validas:
         return lista_letters
-
+    
     letter_atual = Letter()
     indice_let = 0
     posicao_let = 1
-
     contador_caracteres = 0
     memoria = valor_zerar(True)
 
     for letra in letras_validas:
-
         if contador_caracteres == 0:
             letter_atual.lets[indice_let].memoria_inicial = list(memoria)
+
         bits_refinados = [int(b) for b in caracteres[letra]]
-
         valores_letra = neuronio_letra_dict[letra].calcular(bits_refinados)
-
         memoria_anterior = list(memoria)
-
         entrada_memoria = memoria_anterior + valores_letra
-
         memoria = atualizar_memoria(memoria_anterior, valores_letra)
 
         letter_atual.lets[indice_let].historico_memoria.append({
@@ -177,7 +174,6 @@ def gerar_let_letters(texto, neuronio_letra_dict, neuronio_memoria_lista):
         })
 
         letter_atual.lets[indice_let].caracteres.append(letra)
-
         contador_caracteres += 1
 
         if contador_caracteres == 5:
@@ -191,17 +187,13 @@ def gerar_let_letters(texto, neuronio_letra_dict, neuronio_memoria_lista):
             memoria = valor_zerar(True)
 
             if indice_let == 5:
-
                 lista_letters.append(letter_atual)
-
                 letter_atual = Letter()
                 indice_let = 0
 
     if contador_caracteres > 0:
-
         letter_atual.lets[indice_let].estado_memoria = list(memoria)
         letter_atual.lets[indice_let].posicao = posicao_let
-
         indice_let += 1
 
     if indice_let > 0:
@@ -209,7 +201,7 @@ def gerar_let_letters(texto, neuronio_letra_dict, neuronio_memoria_lista):
 
     return lista_letters
 #endregion
-        
+
 #region Neuronios
 class NeuronioSaida:
     def __init__(self, pesos, bias):
@@ -223,10 +215,12 @@ class NeuronioSaida:
 
         for i, j in zip(self.pesos, binario):
             multiplicacao = i * j
-            result.append(multiplicacao)
 
+        result.append(multiplicacao)
         result.append(self.bias)
+
         return sum(result)
+
 
     def retropropar_e_atualizar(self, erro_gradiente):
         erros_entrada = [erro_gradiente * peso for peso in self.pesos]
@@ -235,17 +229,19 @@ class NeuronioSaida:
             self.pesos[i] -= taxa_aprendizagem * erro_gradiente * self.ultima_entrada[i]
 
         self.bias -= taxa_aprendizagem * erro_gradiente
-
+    
         return erros_entrada
 
-#cria um neuronio para cada letra
+
+#cria 8 neuronio para cada letra
 class NeuronioLetra:
     def __init__(self, quantidade_neuronios):
         self.neuronios = []
-
+        
         for i in range(quantidade_neuronios):
             pesos, bias = gerar_pesos_saida()
             self.neuronios.append(NeuronioSaida(pesos, bias))
+
 
     def calcular(self, entrada):
         valores_ativados = []
@@ -256,11 +252,11 @@ class NeuronioLetra:
 
         return valores_ativados
 
+
     def retropropar_e_atualizar(self, erros_gradiente_saida):
         for n, erro in zip(self.neuronios, erros_gradiente_saida):
             n.retropropar_e_atualizar(erro)
 
-    
 class NeuronioMemoria:
     def __init__(self, pesos, bias):
         self.pesos = pesos
@@ -275,6 +271,7 @@ class NeuronioMemoria:
 
         return self.ultima_saida
 
+    
     def retropropar_e_atualizar(self, erro_camada_seguinte):
         derivada_sigmoid = self.ultima_saida * (1 - self.ultima_saida)
         erro_gradiente = erro_camada_seguinte * derivada_sigmoid
@@ -293,18 +290,17 @@ class NeuronioAdaptavel:
         self.valores_arquivo = [random.uniform(-1, 1) for _ in range(8)]
         self.pesos = valor_zerar(True)
         self.bias = 0.0
-
         self.historico_execucao = []
 
         self.ultima_memoria = None
         self.ultima_entrada = None
         self.ultima_saida = None
 
+
     def calcular(self, memoria):
         self.ultima_memoria = list(memoria)
-
         for i in range(8):
-            self.pesos[i] = memoria[i] * self.valores_arquivo[i]
+           self.pesos[i] = memoria[i] * self.valores_arquivo[i]
 
         return self.pesos
 
@@ -317,7 +313,6 @@ class NeuronioAdaptavel:
 
         self.ultima_entrada = list(memoria)
         self.ultima_saida = 1 / (1 + math.exp(-soma))
-
         self.historico_execucao.append({
             "memoria_contexto": list(memoria),
             "saida_gerada": self.ultima_saida
@@ -334,14 +329,14 @@ class NeuronioAdaptavel:
         self.ultima_entrada = None
         self.ultima_saida = None
 
+
     def retropropar_e_atualizar_arquivo(self, erro_gradiente_camada, taxa_aprendizagem):
         if not self.historico_execucao:
             return
-
+        
         passo_registro = self.historico_execucao.pop()
         memoria_contexto = passo_registro["memoria_contexto"]
         saida_gerada = passo_registro["saida_gerada"]
-
         derivada_sigmoid = saida_gerada * (1 - saida_gerada)
         gradiente_local = erro_gradiente_camada * derivada_sigmoid
 
@@ -376,6 +371,7 @@ class CamadaAdaptavel:
         for neuronio in self.neuronios:
             neuronio.historico_execucao.clear()
 
+
     def retropropar_camada(self, erro_gradiente_saida, taxa_aprendizagem):
         for neuronio, erro in zip(self.neuronios, erro_gradiente_saida):
             neuronio.retropropar_e_atualizar_arquivo(erro, taxa_aprendizagem)
@@ -387,17 +383,17 @@ class ArquivoMemoria:
         self.valores = valores
         self.conteudo = self.ler_conteudo()
 
+
     def ler_conteudo(self):
         with open(self.caminho, "r", encoding="utf-8") as arquivo:
             return arquivo.read()
-        
+
 
 class GerenciadorMemoria:
     def __init__(self):
         self.pasta_memoria = os.path.join(pasta_programa, "memoria")
         self.arquivos = {}
         os.makedirs(self.pasta_memoria, exist_ok = True)
-
 
     def listar_arquivos(self):
         arquivos = []
@@ -408,17 +404,18 @@ class GerenciadorMemoria:
 
                 if nome.lower().endswith(".txt"):
                     arquivos.append(caminho)
-                    
+
         return arquivos
+
 
     def identificar_arquivo (self, caminho):
         return os.path.relpath(caminho, self.pasta_memoria)
 
+
     def obter_memoria(self, caminho, dados_arquivos_memoria):
         identificador = self.identificar_arquivo(caminho)
-        
-        if identificador not in self.arquivos:
 
+        if identificador not in self.arquivos:
             if identificador not in dados_arquivos_memoria:
                 valores_aleatorios = [[random.uniform(-1, 1) for _ in range(8)] for _ in range(8)]
                 dados_arquivos_memoria[identificador] = valores_aleatorios
@@ -427,41 +424,45 @@ class GerenciadorMemoria:
 
         return self.arquivos[identificador]
 
-#salva pesos em um json
+
+cache_contexto_memoria = {}
+
+
 def salvar_pesos(neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria):
     dados = {
         "saida": [{"pesos": n.pesos, "bias": n.bias} for n in neuronios_saida],
         "letras": {letra: [{"pesos": n.pesos, "bias": n.bias} for n in nl.neuronios] for letra, nl in neuronios_letras.items()},
         "memoria": [{"pesos": n.pesos, "bias": n.bias} for n in neuronios_memoria],
-        "arquivo_memoria": dados_arquivos_memoria
+        "arquivo_memoria": dados_arquivos_memoria,
+        "cache_contexto_memoria": cache_contexto_memoria
     }
 
     with open(arquivo_pesos, "w") as arquivos:
         json.dump(dados, arquivos, indent=4)
-
 
 def carregar_pesos():
     with open(arquivo_pesos, "r") as arquivos:
         dados = json.load(arquivos)
 
     neuronios_saida = [NeuronioSaida(d["pesos"], d["bias"]) for d in dados["saida"]]
-
     neuronios_letras = {}
 
     for letra, letra_n in dados["letras"]. items():
         nl = NeuronioLetra(0)
         nl.neuronios = [NeuronioSaida(d["pesos"], d["bias"]) for d in letra_n]
         neuronios_letras[letra] = nl
-
+        
     neuronios_memoria = [NeuronioMemoria(d["pesos"], d["bias"]) for d in dados["memoria"]]
-
     dados_arquivos_memoria = dados.get("arquivo_memoria", {})
+    cache_contexto_memoria = dados.get("cache_contexto", {})
 
     return neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria
+
 
 #pega a letra e retorna o binario do alfabeto
 def converter_caractere(caractere):
     return caracteres[caractere]
+
 
 #faz o caminho inverso, pegando o binario e retornando uma letra
 def converter_bin(dicio, binario):
@@ -474,7 +475,138 @@ def converter_bin(dicio, binario):
         
     return valor_encontrado
 
-#transforma o binario de texto em uma lista de numeros
+
+def calcular_hash_conteudo(texto):
+    return hashlib.md5(texto.encode("utf-8")).hexdigest()
+
+
+def revisar_e_atualizar_cache_conteudo():
+    global cache_contexto_memoria, dados_arquivos_memoria
+
+    arquivos_fisicos = gerenciador_memoria.listar_arquivos()
+    houve_alteracao = False
+
+    disco_atual = {}
+
+    for arq_caminho in arquivos_fisicos:
+        nome_arq = gerenciador_memoria.identificar_arquivo(arq_caminho)
+
+        arquivo_obj = gerenciador_memoria.obter_memoria(arq_caminho, dados_arquivos_memoria)
+
+        hash_calculado = calcular_hash_conteudo(arquivo_obj.conteudo.strip())
+        disco_atual[nome_arq] = {
+            "hash": hash_calculado,
+            "valores_adaptados": arquivo_obj.valores,
+            "conteudo": arquivo_obj.conteudo.strip()
+        }
+
+    nomes_no_cache = list(cache_contexto_memoria.keys())
+    hashes_no_cache = {v["hash"]: k for k, v in cache_contexto_memoria.items()}
+    arquivos_processados_no_disco = set()
+
+    for nome_disco, dados_disco in disco_atual.items():
+        hash_disco = dados_disco["hash"]
+        conteudo_disco = dados_disco["conteudo"]
+
+        if nome_disco in cache_contexto_memoria and cache_contexto_memoria[nome_disco]["hash"] == hash_disco:
+            arquivos_processados_no_disco.add(nome_disco)
+            continue
+
+        if nome_disco in cache_contexto_memoria and cache_contexto_memoria[nome_disco]["hash"] != hash_disco:
+            vetor_novo = processar_vetor_memoria(conteudo_disco)
+            cache_contexto_memoria[nome_disco] = {
+                "hash": hash_disco,
+                "valores_adaptados": disco_atual[nome_disco]["valores_adaptados"],
+                "vetor_memoria": vetor_novo
+                }
+            
+            arquivos_processados_no_disco.add(nome_disco)
+            houve_alteracao = True
+            continue
+
+        if nome_disco not in cache_contexto_memoria and hash_disco in hashes_no_cache:
+            nome_antigo = hashes_no_cache[hash_disco]
+            cache_contexto_memoria[nome_disco] = {
+                "hash": hash_disco,
+                "vetor_memoria": list(cache_contexto_memoria[nome_antigo]["vetor_memoria"])
+            }
+
+            del cache_contexto_memoria[nome_antigo]
+            del hashes_no_cache[hash_disco]
+            arquivos_processados_no_disco.add(nome_disco)
+            houve_alteracao = True
+            continue
+
+    for nome_disco, dados_disco in disco_atual.items():
+        if nome_disco in arquivos_processados_no_disco:
+            continue
+
+        hash_disco = dados_disco["hash"]
+        conteudo_disco = dados_disco["conteudo"]
+
+        orfaos_no_cache = [n for n in cache_contexto_memoria.keys() if n not in disco_atual]
+
+        if orfaos_no_cache:
+            nome_substituido = orfaos_no_cache[0]
+            vetor_novo = processar_vetor_memoria(conteudo_disco)
+            del cache_contexto_memoria[nome_substituido]
+            houve_alteracao = True
+
+        else:
+            vetor_novo = processar_vetor_memoria(conteudo_disco)
+            cache_contexto_memoria[nome_disco] = {
+                "hash": hash_disco,
+                "valore_adaptados": disco_atual[nome_disco]["valores_adaptados"],
+                "vetor_memoria": vetor_novo
+                }
+
+            houve_alteracao = True
+
+        for nome_cache in list(cache_contexto_memoria.keys()):
+            if nome_cache not in disco_atual:
+                del cache_contexto_memoria[nome_cache]
+                houve_alteracao = True
+
+        if houve_alteracao:
+            salvar_pesos(neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria)
+
+
+def processar_vetor_memoria(conteudo):
+    if not conteudo:
+        return valor_zerar(True)
+    
+    memoria_global = gerar_let_letters(conteudo, neuronios_letras, neuronios_memoria)
+    
+    if not memoria_global:
+        return valor_zerar(True)
+    
+    ultimo_letter = memoria_global[-1]
+
+    for let in reversed(ultimo_letter.lets):
+        if let.estado_memoria is not None:
+            return list(let.estado_memoria)
+        
+    return valor_zerar(True)
+
+
+def gerar_memoria_texto_arquivo(caminho_arquivo):
+    global cache_contexto_memoria
+
+    try:
+        identificador = gerenciador_memoria.identificar_arquivo(caminho_arquivo)
+
+        if identificador in cache_contexto_memoria:
+            return list(cache_contexto_memoria[identificador]["vetor_memoria"])
+
+        with open(caminho_arquivo, "r", encoding="utf-8") as f:
+            conteudo = f.read().strip()
+
+        return processar_vetor_memoria(conteudo)
+
+    except Exception:
+        return valor_zerar(True)
+
+    
 def refinar_binario(binario):
     binario_convertido = []
 
@@ -493,9 +625,8 @@ def gerar_pesos_saida():
         pesos.append(peso_gerado)
 
     bias = random.uniform(-1, 1)
-
     return pesos, bias
-
+    
 #cria os pesos do neuronio de memoria
 def gerar_pesos_memoria():
     pesos = []
@@ -511,16 +642,17 @@ def gerar_pesos_memoria():
 def gerar_saida(let_objeto):
     if let_objeto.estado_memoria is None:
         return valor_zerar(True)
-        
+    
     memoria = let_objeto.estado_memoria
     valores_saida = []
 
     for neuronio in neuronios_saida:
         soma = neuronio.somatorio(memoria)
-        valor = 1 / (1 + math.exp(-soma)) 
+        valor = 1 / (1 + math.exp(-soma))
         valores_saida.append(valor)
 
     return valores_saida
+
 
 # Transforma a memória do Let em binário para os neurônios de saída
 def memoria_para_binario(let_objeto):
@@ -530,14 +662,15 @@ def memoria_para_binario(let_objeto):
     for valor in valores_saida:
         if valor >= 0.5:
             bits_saida.append(1)
+    
         else:
             bits_saida.append(0)
 
     return bits_saida
 
+
 #region listas
 bits = []
-
 neuronios_saida = []
 neuronios_letras = {}
 neuronios_memoria = []
@@ -549,6 +682,7 @@ memoria_resposta_esperada = valor_zerar(True)
 camada_adaptavel = CamadaAdaptavel()
 dados_arquivos_memoria = {}
 gerenciador_memoria = GerenciadorMemoria()
+
 
 #region Verificação de pesos existentes
 if os.path.exists(arquivo_pesos):
@@ -565,59 +699,57 @@ if os.path.exists(arquivo_pesos):
             NeuronioMemoria(*gerar_pesos_memoria())
             for _ in range(8)
         ]
-
         salvar_pesos(neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria)
-
 else:
     neuronios_saida = [NeuronioSaida(*gerar_pesos_saida()) for _ in range(8)]
-
     for letra in caracteres:
         neuronios_letras[letra] = NeuronioLetra(8)
-
     neuronios_memoria = [NeuronioMemoria(*gerar_pesos_memoria()) for _ in range(8)]
-
     salvar_pesos(neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria)
 #endregion
 
 #atualiza a memoria
 def atualizar_memoria(memoria, valores_letra):
     entrada_memoria = memoria + valores_letra
-
-    nova_memoria = [neuronio.calcular(entrada_memoria) for neuronio in neuronios_memoria]
-
-    valores_adaptados = camada_adaptavel.processar(memoria_contexto_ativa)
-
+    nova_memoria = [neuronio.calcular(entrada_memoria) for neuronio in neuronios_memoria] 
+    valores_adaptados = camada_adaptavel.processar(memoria_contexto_ativa) 
     memoria_final = [(nova_memoria[i] + valores_adaptados[i]) / 2 for i in range(8)]
-
     return memoria_final
 
 
-
 def executar_retropropagacao(texto_entrada, texto_correto, arquivo_ativo_caminho=None):
+    global treinamento_auto, taxa_aprendizagem, neuronios_letras, neuronios_memoria, neuronios_saida
+
     memoria_global_pergunta = gerar_let_letters(texto_entrada, neuronios_letras, neuronios_memoria)
     memoria_global_correcao = gerar_let_letters(texto_correto, neuronios_letras, neuronios_memoria)
+
+    gradientes_acumulados = {
+        "saida": [{"pesos": [0.0]*8, "bias": 0.0} for _ in range(8)],
+        "letras": {},
+        "memoria": [{"pesos": [0.0]*16, "bias": 0.0} for _ in range(8)],
+        "arquivo_memoria": {}
+    }
 
     for indice_letter, letter in enumerate(memoria_global_pergunta):
         if indice_letter >= len(memoria_global_correcao):
             break
-
+    
         letter_correto = memoria_global_correcao[indice_letter]
 
         for indice_let, let in enumerate(letter.lets):
             if indice_let >= len(letter_correto.lets):
                 break
-
+            
             if let.estado_memoria is None:
                 continue
-
+        
             let_correto = letter_correto.lets[indice_let]
 
             if let_correto.estado_memoria is None:
                 continue
-
+        
             memoria = list(let.estado_memoria)
             memoria_correta = list(let_correto.estado_memoria)
-
             erro_memoria_atual = [memoria[i] - memoria_correta[i] for i in range(8)]
             historico = let.historico_memoria
 
@@ -629,30 +761,43 @@ def executar_retropropagacao(texto_entrada, texto_correto, arquivo_ativo_caminho
                     soma = sum(peso * valor for peso, valor in zip(n_mem.pesos, entrada_memoria)) + n_mem.bias
                     saida = 1 / (1 + math.exp(-soma))
                     derivada_sigmoid = saida * (1 - saida)
-                    
                     erro_gradiente = erro_memoria_atual[m_idx] * derivada_sigmoid
 
                     for i in range(16):
                         erros_entrada[i] += erro_gradiente * n_mem.pesos[i]
 
-                    for i in range(16):
-                        n_mem.pesos[i] -= taxa_aprendizagem * erro_gradiente * entrada_memoria[i]
+                    if treinamento_auto:
+                        for ii in range(16):
+                            gradientes_acumulados["memoria"][m_idx]["pesos"][ii] += taxa_aprendizagem * erro_gradiente * entrada_memoria[ii]
+                        gradientes_acumulados["memoria"][m_idx]["bias"] += taxa_aprendizagem * erro_gradiente
 
-                    n_mem.bias -= taxa_aprendizagem * erro_gradiente
+                    else: 
+                        for i in range(16):
+                            n_mem.pesos[i] -= taxa_aprendizagem * erro_gradiente * entrada_memoria[i]
+
+                        n_mem.bias -= taxa_aprendizagem * erro_gradiente
 
                 erro_memoria_atual = erros_entrada[:8]
                 erros_valores_letra = erros_entrada[8:16]
-
                 indice_caractere = len(historico) - 1 - indice_reverso
                 letra_entrada = let.caracteres[indice_caractere]
 
                 if letra_entrada not in neuronios_letras:
                     continue
 
-                neuronios_letras[letra_entrada].retropropar_e_atualizar(erros_valores_letra)
+                if treinamento_auto:
+                    if letra_entrada not in gradientes_acumulados["letras"]:
+                        gradientes_acumulados["letras"][letra_entrada] = [{"pesos": [0.0]*8, "bias": 0.0} for _ in range(8)]
 
-                camada_adaptavel.retropropar_camada(erros_valores_letra, taxa_aprendizagem)
+                    for idx, n_saida in enumerate(neuronios_letras[letra_entrada].neuronios):
+                        for i in range(len(n_saida.pesos)):
+                            gradientes_acumulados["letras"][letra_entrada][idx]["pesos"][i] += taxa_aprendizagem * erros_valores_letra[idx] * n_saida.ultima_entrada[i]
 
+                        gradientes_acumulados["letras"][letra_entrada][idx]["bias"] += taxa_aprendizagem * erros_valores_letra[idx]
+                else: 
+                    neuronios_letras[letra_entrada].retropropar_e_atualizar(erros_valores_letra)
+                    camada_adaptavel.retropropar_camada(erros_valores_letra, taxa_aprendizagem)
+                
     if memoria_global_correcao:
         ultimo_letter = memoria_global_correcao[-1]
         ultimo_let = None
@@ -663,22 +808,25 @@ def executar_retropropagacao(texto_entrada, texto_correto, arquivo_ativo_caminho
         
         if ultimo_let is not None:
             memoria_final = ultimo_let.estado_memoria
-            
             bits_parar = [int(b) for b in caracteres["/parar"]]
-            
+
             for idx, neuronio_saida in enumerate(neuronios_saida):
                 soma = neuronio_saida.somatorio(memoria_final)
                 saida_atual = 1 / (1 + math.exp(-soma))
-                
                 erro_bit = saida_atual - bits_parar[idx]
                 derivada = saida_atual * (1 - saida_atual)
                 gradiente_saida = erro_bit * derivada
-                
-                neuronio_saida.retropropar_e_atualizar(gradiente_saida)
 
+                if treinamento_auto: 
+                    for i in range(len(neuronio_saida.pesos)):
+                        gradientes_acumulados["saida"][idx]["pesos"][i] += taxa_aprendizagem * gradiente_saida * neuronio_saida.ultima_entrada[i]
+
+                    gradientes_acumulados["saida"][idx]["bias"] += taxa_aprendizagem * gradiente_saida
+                else:
+                    neuronio_saida.retropropar_e_atualizar(gradiente_saida)
+                    
     if arquivo_ativo_caminho and dados_arquivos_memoria:
         identificador = gerenciador_memoria.identificar_arquivo(arquivo_ativo_caminho)
-    
         m_pergunta = valor_zerar(True)
 
         if identificador in dados_arquivos_memoria:
@@ -697,14 +845,25 @@ def executar_retropropagacao(texto_entrada, texto_correto, arquivo_ativo_caminho
 
         m_contexto = gerar_memoria_contexto_arquivo(arquivo_ativo_caminho)
 
-        for i in range(8):
-            for j in range(8):
-                erro_associativo = (m_resposta[i] - m_pergunta[i]) * m_contexto[j]
-                dados_arquivos_memoria[identificador][i][j] -= (taxa_aprendizagem * erro_associativo)
+        if treinamento_auto:
+            if identificador not in gradientes_acumulados["arquivo_memoria"]:
+                gradientes_acumulados["arquivo_memoria"][identificador] = [[0.0]*8 for _ in range(8)]
+
+            for i in range(8):
+                for j in range(8):
+                    gradientes_acumulados["arquivo_memoria"][identificador][i][j] += (taxa_aprendizagem * (m_resposta[i] - m_pergunta[i]) * m_contexto[j])
+                    
+        else: 
+            for i in range(8):
+                for j in range(8):
+                   dados_arquivos_memoria[identificador][i][j] -= (taxa_aprendizagem * (m_resposta[i] - m_pergunta[i]) * m_contexto[j])
+
+    if treinamento_auto:
+        return gradientes_acumulados
+
 
 def testar_rede(texto):
     memoria_global = gerar_let_letters(texto, neuronios_letras, neuronios_memoria)
-
     comando_parar = "/parar"
     limite_caracteres = 20
     resposta_gerada = []
@@ -736,7 +895,7 @@ def testar_rede(texto):
             soma = n.somatorio(memoria)
             ativacao = 1 / (1 + math.exp(-soma)) # Mantém o valor estritamente entre 0 e 1
             bits_saida.append(1 if ativacao >= 0.5 else 0)
-            
+
         binario_saida = "".join(str(bit) for bit in bits_saida)
         letra_saida = converter_bin(caracteres, binario_saida)
 
@@ -751,7 +910,7 @@ def testar_rede(texto):
 
         if len(texto_atual) >= limite_caracteres:
             break
-
+        
         if letra_saida == "{Erro}":
             valores_letra = valor_zerar(True)
 
@@ -763,8 +922,8 @@ def testar_rede(texto):
 
     texto_final = "".join(resposta_gerada)
 
-    print("\nRESULTADO")
-    print(f"Resposta: {texto_final}")
+    if not treinamento_auto:
+        print(f"Resposta Mani: {texto_final}")
 
     return texto_final
 
@@ -774,10 +933,12 @@ def preparar_camada_para_arquivo(caminho_arquivo, gerenciador, dados_arquivos):
 
     for idx, neuronio in enumerate(camada_adaptavel.neuronios):
         neuronio.valores_arquivo = arquivo_obj.valores[idx]
-
+    
     return arquivo_obj
 
+
 def gerar_memoria_contexto_arquivo(caminho_arquivo):
+
     try:
         with open(caminho_arquivo, "r", encoding = "utf-8") as f:
             conteudo = f.read().strip()
@@ -800,13 +961,14 @@ def gerar_memoria_contexto_arquivo(caminho_arquivo):
 
     except Exception:
         return valor_zerar(True)
-    
+
+
 def escolher_arquivo(texto_pergunta, arquivos_disponiveis, dados_arquivos):
     memoria_global = gerar_let_letters(texto_pergunta, neuronios_letras, neuronios_memoria)
 
     if not  memoria_global:
         return arquivos_disponiveis[0] if arquivos_disponiveis else None
-
+   
     ultimo_letter = memoria_global[-1]
     ultimo_let = None
 
@@ -814,22 +976,23 @@ def escolher_arquivo(texto_pergunta, arquivos_disponiveis, dados_arquivos):
         if let.estado_memoria is not None:
             ultimo_let = let
             break
-
+       
     if ultimo_let is None or ultimo_let.estado_memoria is None:
         return arquivos_disponiveis[0] if arquivos_disponiveis else None
-
+   
     memoria_pergunta = ultimo_let.estado_memoria
-
     melhor_arquivo = None
     maior_afinidade = -float("inf")
 
     for arq in arquivos_disponiveis:
         identificador = gerenciador_memoria.identificar_arquivo(arq)
 
-        arquivo_obj = gerenciador_memoria.obter_memoria(arq, dados_arquivos)
-        matriz_arquivo = arquivo_obj.valores
+        if identificador in cache_contexto_memoria and "valores_adaptados" in cache_contexto_memoria[identificador]:
+            matriz_arquivo = cache_contexto_memoria[identificador]["valores_adaptados"]
 
-        matriz_arquivo = dados_arquivos[identificador]
+        else:
+            arquivo_obj = gerenciador_memoria.obter_memoria(arq, dados_arquivos_memoria)
+            matriz_arquivo = dados_arquivos[identificador]
 
         afinidade_atual = 0.0
 
@@ -842,213 +1005,335 @@ def escolher_arquivo(texto_pergunta, arquivos_disponiveis, dados_arquivos):
             melhor_arquivo = arq
 
     return melhor_arquivo
+        
 
 def ajustar_arquivo_escolhido(texto_pergunta, arquivo_correto):
-    memoria_global = gerar_let_letters(texto_pergunta, neuronios_letras, neuronios_memoria)
+   memoria_global = gerar_let_letters(texto_pergunta, neuronios_letras, neuronios_memoria)
 
-    if not memoria_global:
-        return
+   if not memoria_global:
+       return
+   
+   ultimo_letter = memoria_global[-1]
+   ultimo_let = None
 
-    ultimo_letter = memoria_global[-1]
-    ultimo_let = None
+   for let in reversed(ultimo_letter.lets):
+       if let.estado_memoria is not None:
+           ultimo_let = let
+           break
+       
+   if ultimo_let is None or ultimo_let.estado_memoria is None:
+       return
+   
+   memoria_pergunta = ultimo_let.estado_memoria
+   identificador_correto = gerenciador_memoria.identificar_arquivo(arquivo_correto)
 
-    for let in reversed(ultimo_letter.lets):
-        if let.estado_memoria is not None:
-            ultimo_let = let
-            break
+   if identificador_correto not in dados_arquivos_memoria:
+       return
+   
+   matriz_correta = dados_arquivos_memoria[identificador_correto]
 
-    if ultimo_let is None or ultimo_let.estado_memoria is None:
-        return
+   for i in range(8):
+       for j in range(8):
+           ajuste = memoria_pergunta[i] * matriz_correta[i][j]
+           matriz_correta[i][j] += taxa_aprendizagem * ajuste
 
-    memoria_pergunta = ultimo_let.estado_memoria
+def salvar_banco_dados_treino(pergunta, resposta_correta, arquivo_contexto):
+    pasta_treino = os.path.join(pasta_programa, "banco treino")
+    os.makedirs(pasta_treino, exist_ok=True)
 
-    identificador_correto = gerenciador_memoria.identificar_arquivo(arquivo_correto)
+    caminho_json = os.path.join(pasta_treino, "banco_dados.json")
+    dados = []
 
-    if identificador_correto not in dados_arquivos_memoria:
-        return
+    if os.path.exists(caminho_json):
+        try:
+            with open(caminho_json, "r", encoding="utf-8") as f:
+                dados = json.load(f)
 
-    matriz_correta = dados_arquivos_memoria[identificador_correto]
+        except Exception:
+            dados = []
 
-    for i in range(8):
-        for j in range(8):
-            ajuste = memoria_pergunta[i] * matriz_correta[i][j]
-            matriz_correta[i][j] += taxa_aprendizagem * ajuste
+    nova_entrada = {
+        "pergunta": pergunta,
+        "resposta_esperada": resposta_correta,
+        "arquivo_contexto": arquivo_contexto
+    }
+
+    if nova_entrada not in dados:
+        dados.append(nova_entrada)
+
+        with open(caminho_json, "w", encoding="utf-8") as f:
+            json.dump(dados, f, indent=4, ensure_ascii=False)
+
+revisar_e_atualizar_cache_conteudo()
 
 #modo adm
 adm = False
+if treinamento_auto:
+    resposta_menu = 1
 
-resposta_menu = 3
+    while True:
+        linha_entrada = sys.stdin.readline()
 
-while True:
-    valores_calculados = []
-    bits = []
+        if not linha_entrada:
+            break
 
+        try:
+            payload = json.loads(linha_entrada.strip())
+            texto = payload["pergunta"]
+            texto_certo = payload["resposta_esperada"]
+            arq_contexto = payload.get("arquivo_contexto", None)
+
+            palpite = testar_rede(texto)
+            acertou = 0
+
+            if palpite == texto_certo:
+                acertou = 1 
+
+            else: 
+                acertou = 0
+
+            grads = executar_retropropagacao(texto, texto_certo, arq_contexto)
+
+            resposta = {
+                "status": "sucesso", 
+                "acertou": acertou, 
+                "gradientes": grads
+            }
+            print(json.dumps(resposta), flush=True)
+
+        except Exception as e:
+            print(json.dumps({
+                "status": "erro",
+                "erro": str(e)
+            }), flush=True)
+
+    sys.exit(0)
+
+else:
+    resposta_menu = 3
     while True:
         valores_calculados = []
         bits = []
 
-        if resposta_menu == 1:
-            quebrar_texto()
+        while True:
+            valores_calculados = []
+            bits = []
 
-            arquivos_disponiveis = gerenciador_memoria.listar_arquivos()
-
-            if not arquivos_disponiveis:
-                print("Nnenhum arquivo .txt encontrado na pasta de memoria.")
-                print("crie um arquivo para servir de contexto")
-                input("pressione Enter para voltar ao menu")
-                break
-
-            print("Arquivos disponiveis para treino")
-
-            for idx, arq in enumerate(arquivos_disponiveis):
-                print(f"{idx+1} - {gerenciador_memoria.identificar_arquivo(arq)}")
-
-
-            texto = input("Escreva um texto: ")
-
-            if texto == "adm.mode on":
-                adm = True
-
-                while adm:
-                    quebrar_texto()
-
-                    modo_adm = input("> ")
-
-                    if modo_adm == "adm.mode off":
-                        adm = False
-
-                    elif modo_adm == "/menu":
-                        break
-                break
-
-            else:
+            if resposta_menu == 1:
+                quebrar_texto()
                 arquivos_disponiveis = gerenciador_memoria.listar_arquivos()
 
-                memoria_global_p = gerar_let_letters(texto, neuronios_letras, neuronios_memoria)
+                if not arquivos_disponiveis:
+                    print("Nnenhum arquivo .txt encontrado na pasta de memoria.")
+                    print("crie um arquivo para servir de contexto")
+                    input("pressione Enter para voltar ao menu")
+                    break
 
-                if memoria_global_p:
-                    for let in reversed(memoria_global_p[-1].lets):
-                        if let.estado_memoria is not None:
-                            memoria_pergunta_ativa = list(let.estado_memoria)
+                print("Arquivos disponiveis para treino")
+
+                for idx, arq in enumerate(arquivos_disponiveis):
+                    print(f"{idx+1} - {gerenciador_memoria.identificar_arquivo(arq)}")
+
+                texto = input("Escreva um texto: ")
+
+                if texto == "adm.mode on":
+                    adm = True
+
+                    while adm:
+                        quebrar_texto()
+                        modo_adm = input("> ")
+
+                        if modo_adm == "adm.mode off":
+                            adm = False
+
+                        elif modo_adm == "/menu":
                             break
 
-                if arquivos_disponiveis:
-                    arquivo_escolhido = escolher_arquivo(texto, arquivos_disponiveis, dados_arquivos_memoria)
-                    preparar_camada_para_arquivo(arquivo_escolhido, gerenciador_memoria, dados_arquivos_memoria)
-                    memoria_contexto_ativa = gerar_memoria_contexto_arquivo(arquivo_escolhido)
+                    break
 
-                    print(f"[Contexto Ativo]: {gerenciador_memoria.identificar_arquivo(arquivo_escolhido)}")
+                else:
+                    arquivos_disponiveis = gerenciador_memoria.listar_arquivos()
+                    memoria_global_p = gerar_let_letters(texto, neuronios_letras, neuronios_memoria)
 
+                    if memoria_global_p:
+                        for let in reversed(memoria_global_p[-1].lets):
+                            if let.estado_memoria is not None:
+                                memoria_pergunta_ativa = list(let.estado_memoria)
+                                break
 
-                palpite = testar_rede(texto)
-                camada_adaptavel.zerar_camada()
+                    if arquivos_disponiveis:
+                        arquivo_escolhido = escolher_arquivo(texto, arquivos_disponiveis, dados_arquivos_memoria)
+                        preparar_camada_para_arquivo(arquivo_escolhido, gerenciador_memoria, dados_arquivos_memoria)
+                        memoria_contexto_ativa = gerar_memoria_contexto_arquivo(arquivo_escolhido)
+                        print(f"[Contexto Ativo]: {gerenciador_memoria.identificar_arquivo(arquivo_escolhido)}")
 
-                memoria_pergunta_ativa = valor_zerar(True)
-                memoria_contexto_ativa = valor_zerar(True)
+                    palpite = testar_rede(texto)
+                    camada_adaptavel.zerar_camada()
 
-                arquivo_acerto = input("\nO arquivo escolhido foi correto? (s/n) ").lower()
+                    memoria_pergunta_ativa = valor_zerar(True)
+                    memoria_contexto_ativa = valor_zerar(True)
 
-                if arquivo_acerto == "n":
-                    while True:
-                        try:
-                            print("\nArquivos disponiveis para treino")
+                    arquivo_acerto = input("\nO arquivo escolhido foi correto? (s/n) ").lower()
 
-                            for idx, arq in enumerate(arquivos_disponiveis):
-                                print(f"{idx+1} - {gerenciador_memoria.identificar_arquivo(arq)}")
+                    if arquivo_acerto == "n":
+                        while True:
+                            try:
+                                print("\nArquivos disponiveis para treino")
+
+                                for idx, arq in enumerate(arquivos_disponiveis):
+                                    print(f"{idx+1} - {gerenciador_memoria.identificar_arquivo(arq)}")
 
                                 arquivo_correto = int(input("Digite o número do arquivo correto: ")) - 1
 
-                            print("Entrada inválida. Digite um número.")
+                                if 0 <= arquivo_correto < len(arquivos_disponiveis):
+                                    arquivo_escolhido = arquivos_disponiveis[arquivo_correto]
+                                    ajustar_arquivo_escolhido(texto, arquivo_escolhido)
+                                    memoria_contexto_ativa = gerar_memoria_contexto_arquivo(arquivo_escolhido)
+                                    print(f"Arquivo {gerenciador_memoria.identificar_arquivo(arquivo_escolhido)} ajustado com sucessso")
+                                    break
 
-                            if 0 <= arquivo_correto < len(arquivos_disponiveis):
-                                arquivo_correto = arquivos_disponiveis[arquivo_correto]
-                                ajustar_arquivo_escolhido(texto, arquivo_correto)
+                                else:
+                                    print("Número de arquivo inválido. Tente novamente")
 
-                                print(f"Arquivo {gerenciador_memoria.identificar_arquivo(arquivo_correto)} ajustado com sucesso.")
+                            except ValueError:
+                                print("Entrada inválida. Digite um número.")
+
+                    acerto = input("\nAcertei? (s/n) ").lower()
+
+                    if acerto == "n":
+                        while True:
+                            texto_certo = input("digite a resposta correta: ")
+                            valido = all(letra in caracteres for letra in texto_certo)
+
+                            if valido:
+                                memoria_global_r = gerar_let_letters(texto_certo, neuronios_letras, neuronios_memoria)
+
+                                if memoria_global_r:
+                                    for let in reversed(memoria_global_r[-1].lets):
+                                        if let.estado_memoria is not None:
+                                            memoria_resposta_esperada = list(let.estado_memoria)
+                                            break
+
+                                salvar_banco_dados_treino(texto, texto_certo, arquivo_escolhido)
+                                executar_retropropagacao(texto, texto_certo, arquivo_escolhido if "arquivo_escolhido" in locals() else None)
+                                time.sleep(0.01)
+                                memoria_resposta_esperada = valor_zerar(True)
+                                print("Pesos balanceados")
                                 break
 
                             else:
-                                print("Número de arquivo inválido. Tente novamente")
+                                print("Caractere invalido")
+                                continue
 
-                        except ValueError:
-                            print("Entrada inválida. Digite um número.")
+                        salvar_pesos(neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria)
+                        input("\nPressione ENTER pra continuar")
+                    else:
+                        print("Ótimo, vamos continuar")
 
-                acerto = input("\nAcertei? (s/n) ").lower()
-
-                if acerto == "n":
-                    while True:
-                        texto_certo = input("digite a resposta correta: ")
-                        valido = all(letra in caracteres for letra in texto_certo)
-
-                        if valido:
-                            memoria_global_r = gerar_let_letters(texto_certo, neuronios_letras, neuronios_memoria)
-
-                            if memoria_global_r:
-                                for let in reversed(memoria_global_r[-1].lets):
-                                    if let.estado_memoria is not None:
-                                        memoria_resposta_esperada = list(let.estado_memoria)
-                                        break
-
-                            executar_retropropagacao(texto, texto_certo, arquivo_escolhido if "arquivo_escolhido" in locals() else None)
-                            time.sleep(0.01)
-
-                            memoria_resposta_esperada = valor_zerar(True)
-
-                            print("Pesos balanceados")
-                            break
-
-                        else:
-                            print("Caractere invalido")
-                            continue
-
-                    salvar_pesos(neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria)
-                    input("\nPressione ENTER pra continuar")
-
-                else:
-                    print("Ótimo, vamos continuar")
-
-                quebrar_texto()
-
-        elif resposta_menu == 2:
-            salvar_pesos(neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria)
-            print("pesos salvos")
-            exit()
-
-        elif resposta_menu == 3:
-            texto = input("escreva um texto: ")
-
-            if texto == "adm.mode on":
-                adm = True
-
-                while adm:
                     quebrar_texto()
 
-                    modo_adm = input("> ")
+            elif resposta_menu == 2:
+                salvar_pesos(neuronios_saida, neuronios_letras, neuronios_memoria, dados_arquivos_memoria)
+                print("pesos salvos")
+                exit()
 
-                    if modo_adm == "adm.mode off":
-                        adm = False
+            elif resposta_menu == 3:
+                pergunta_mani = input("Pergunte algo a Mani: ")
 
-                    elif modo_adm == "/menu":
-                        break
+                if pergunta_mani == "adm.mode on":
+                    adm = True
+
+                    while adm:
+                        quebrar_texto()
+                        modo_adm = input("> ")
+
+                        if modo_adm == "adm.mode off":
+                            adm = False
+
+                        elif modo_adm == "/menu":
+                            break
+
+                    else:
+                        print("opção invaldia")
+
+                    break
+
                 else:
-                    print("opção invaldia")
+
+                    arquivos_disponiveis = gerenciador_memoria.listar_arquivos()
+                    memoria_global_p = gerar_let_letters(pergunta_mani, neuronios_letras, neuronios_memoria)
+
+                    if memoria_global_p:
+                        for let in reversed(memoria_global_p[-1].lets):
+                            if let.estado_memoria is not None:
+                                memoria_pergunta_ativa = list(let.estado_memoria)
+                                break
+
+                    if arquivos_disponiveis:
+                        arquivo_escolhido = escolher_arquivo(pergunta_mani, arquivos_disponiveis, dados_arquivos_memoria)
+                        preparar_camada_para_arquivo(arquivo_escolhido, gerenciador_memoria, dados_arquivos_memoria)
+                        memoria_contexto_ativa = gerar_memoria_contexto_arquivo(arquivo_escolhido)
+
+                    palpite = testar_rede(pergunta_mani)
+                    camada_adaptavel.zerar_camada()
+
+                    memoria_pergunta_ativa = valor_zerar(True)
+                    memoria_contexto_ativa = valor_zerar(True)
+
+
+            elif resposta_menu == 4:
+                print("Gerenciador de caches\n")
+
+                print("Atualizando conteudo cache...")
+                print("1 - Sincronizar e atualizar cache")
+                print("2 - Remover arquivo do cache\n")
+                opcao_cache = int(input("Escolha uma opção: "))
+
+                if opcao_cache == 1:
+                    revisar_e_atualizar_cache_conteudo()
+                    print("Conteudo revisado")
+                    time.sleep(1)
+                    break
+
+                elif opcao_cache == 2:
+                    if not cache_contexto_memoria:
+                        print("[CACHE] O cache está vazio")
+
+                    else:
+                        print("Arquivos atuais cache: ")
+
+                        for idx, nome_cache in enumerate(cache_contexto_memoria.keys()):
+                            print(f"{idx+1} - {nome_cache}")
+
+                        alvo = input("Digite o nome do arquivo para remoção: ")
+
+                        if alvo.isdigit():
+                            chaves = list(cache_contexto_memoria.keys())
+                            idx_alvo = int(alvo) - 1
+
+                            if 0 <= idx_alvo < len(chaves): 
+                                alvo = chaves[idx_alvo]
+
+                        if alvo in cache_contexto_memoria:
+                            del cache_contexto_memoria[alvo]
+                            print(f'[CACHE] Registro "{alvo}" for removido com sucesso da memória RAM')
+
+                            salvar_pesos(neuronios_letras, neuronios_letras, neuronios_memoria, dados_arquivos_memoria)
+                            print("[DISCO] Alterações salvas no pesos.json")
+
+                        else:
+                            print("[ERRO] Arquivo não encontrado no cache")
+
                 break
-            
-            else:
-                print("")
-                #mesma coisa do 1 mas com interface voltada ao usuario
 
-        else:
-            exit()
-#region Menu
-    quebrar_texto()
-    print("Sistema Neuron")
-    print("\n Deseja:")
-    print("1 - Iniciar treinamento")
-    print("2 - Salvar e terminar treinamento")
-    print("3 - Testar")
-    print("4 - Enserrar")
-
-    resposta_menu = int(input("Escolha um item do menu: "))
-    quebrar_texto()
-#endregion
+        #region Menu
+        quebrar_texto()
+        print("Sistema Neuron")
+        print("\n Deseja:")
+        print("1 - Iniciar treinamento")
+        print("2 - Salvar e terminar treinamento")
+        print("3 - Testar")
+        print("4 - Gerenciar cache")
+        resposta_menu = int(input("Escolha um item do menu: "))
+        quebrar_texto()
+        #endregion
